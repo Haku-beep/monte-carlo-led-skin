@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Simulasi Monte Carlo sederhana untuk transport cahaya merah pada satu lapisan kulit."
+    />
+    <title>Monte Carlo Cahaya LED pada Kulit</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="hero">
+      <p class="eyebrow">PROJECT UAS · METODE MONTE CARLO</p>
+      <h1>Bagaimana cahaya bergerak di dalam kulit?</h1>
+      <p class="intro">
+        Ikuti paket foton saat bergerak, diserap, dihamburkan, atau keluar dari
+        lapisan kulit. Ubah parameternya dan lihat bagaimana hasil simulasi ikut
+        berubah.
+      </p>
+      <div class="scope-note">
+        <span class="scope-dot" aria-hidden="true"></span>
+        Model pembelajaran: kulit satu lapis · cahaya merah 660 nm · tanpa alat eksperimen
+      </div>
+    </header>
+
+    <main>
+      <section class="panel setup-panel" aria-labelledby="setup-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">01 · ATUR MODEL</p>
+            <h2 id="setup-title">Parameter simulasi</h2>
+          </div>
+          <p class="section-note">Nilai awal diambil dari artikel kulit pada 660 nm.</p>
+        </div>
+
+        <form id="controls">
+          <div class="control-grid">
+            <label class="control">
+              <span class="control-label">Jumlah paket foton</span>
+              <span class="range-row">
+                <input id="photons" type="range" min="500" max="15000" step="500" value="5000" />
+                <output id="photons-value" for="photons">5.000</output>
+              </span>
+              <span class="hint">Lebih banyak foton biasanya membuat hasil lebih stabil.</span>
+            </label>
+
+            <label class="control">
+              <span class="control-label">Ketebalan lapisan, d</span>
+              <span class="range-row">
+                <input id="thickness" type="range" min="0.2" max="3" step="0.1" value="1" />
+                <output id="thickness-value" for="thickness">1,0 mm</output>
+              </span>
+              <span class="hint">Lapisan dianggap homogen dan datar.</span>
+            </label>
+
+            <label class="control">
+              <span class="control-label">Absorpsi, μ<sub>a</sub></span>
+              <span class="number-row">
+                <input id="mu-a" type="number" min="0" max="0.2" step="0.001" value="0.03316" />
+                <span>mm⁻¹</span>
+              </span>
+              <span class="hint">Nilai awal artikel: 0,03316 mm⁻¹.</span>
+            </label>
+
+            <label class="control">
+              <span class="control-label">Hamburan tereduksi, μ<sub>s</sub>′</span>
+              <span class="number-row">
+                <input id="mu-s-prime" type="number" min="0" max="4" step="0.05" value="1.88212" />
+                <span>mm⁻¹</span>
+              </span>
+              <span class="hint">Nilai awal artikel: 1,88212 mm⁻¹.</span>
+            </label>
+
+            <label class="control">
+              <span class="control-label">Arah hamburan, g</span>
+              <span class="range-row">
+                <input id="g" type="range" min="0" max="0.99" step="0.01" value="0.91" />
+                <output id="g-value" for="g">0,91</output>
+              </span>
+              <span class="hint">g mendekati 1 berarti lebih banyak hamburan ke depan.</span>
+            </label>
+
+            <label class="control">
+              <span class="control-label">Seed bilangan acak</span>
+              <span class="number-row">
+                <input id="seed" type="number" min="0" max="999999" step="1" value="42" />
+                <span>tetap</span>
+              </span>
+              <span class="hint">Seed sama memberi urutan acak yang sama.</span>
+            </label>
+          </div>
+
+          <div class="run-row">
+            <p id="run-status" role="status">Siap dijalankan.</p>
+            <button id="run-button" type="submit">Jalankan simulasi</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="results" aria-labelledby="results-title">
+        <div class="section-heading result-heading">
+          <div>
+            <p class="eyebrow">02 · BACA HASIL</p>
+            <h2 id="results-title">Ke mana fotonnya pergi?</h2>
+          </div>
+          <p id="result-summary" class="section-note">Hasil memakai parameter awal.</p>
+        </div>
+
+        <div class="metric-grid" aria-live="polite">
+          <article class="metric-card">
+            <p>Diserap</p>
+            <strong id="absorbed-value">—</strong>
+            <span>A</span>
+          </article>
+          <article class="metric-card">
+            <p>Kembali keluar dari atas</p>
+            <strong id="reflected-value">—</strong>
+            <span>R · setelah hamburan</span>
+          </article>
+          <article class="metric-card">
+            <p>Diteruskan ke bawah</p>
+            <strong id="transmitted-value">—</strong>
+            <span id="transmitted-error">T · galat baku MC —</span>
+          </article>
+          <article class="metric-card total-card">
+            <p>Neraca paket foton</p>
+            <strong id="total-value">—</strong>
+            <span>A + R + T + belum selesai</span>
+          </article>
+        </div>
+
+        <div class="chart-grid">
+          <article class="panel chart-panel">
+            <h3>Hasil akhir paket foton</h3>
+            <p class="chart-note">Persentase dari seluruh paket yang diluncurkan.</p>
+            <canvas id="outcome-chart" aria-label="Grafik fraksi foton diserap, kembali, dan diteruskan"></canvas>
+          </article>
+          <article class="panel chart-panel">
+            <h3>Serapan menurut kedalaman</h3>
+            <p class="chart-note">Fraksi paket awal yang diserap di tiap interval.</p>
+            <canvas id="depth-chart" aria-label="Grafik serapan paket foton menurut kedalaman"></canvas>
+          </article>
+        </div>
+
+        <article class="panel validation-panel">
+          <div>
+            <p class="eyebrow">03 · CEK KHUSUS</p>
+            <h3>Validasi Beer–Lambert tanpa hamburan</h3>
+            <p>
+              Simulasi kedua dibuat dengan μ<sub>s</sub> = 0. Untuk berkas tegak
+              lurus tanpa pantulan permukaan, transmisi Monte Carlo dibandingkan
+              dengan T = exp(−μ<sub>a</sub>d).
+            </p>
+          </div>
+          <div class="validation-values">
+            <div><span>Transmisi MC</span><strong id="validation-mc">—</strong></div>
+            <div><span>Beer–Lambert</span><strong id="validation-bl">—</strong></div>
+            <div><span>Selisih</span><strong id="validation-diff">—</strong></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel explainer" aria-labelledby="how-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">04 · CARA KERJA</p>
+            <h2 id="how-title">Aturan Monte Carlo yang dipakai</h2>
+          </div>
+        </div>
+        <div class="formula-grid">
+          <div class="formula-card"><span>Koefisien total</span><code>μ<sub>t</sub> = μ<sub>a</sub> + μ<sub>s</sub></code></div>
+          <div class="formula-card"><span>Jarak sebelum tumbukan</span><code>s = −ln(ξ) / μ<sub>t</sub></code></div>
+          <div class="formula-card"><span>Peluang absorpsi</span><code>μ<sub>a</sub> / μ<sub>t</sub></code></div>
+          <div class="formula-card"><span>Konversi hamburan</span><code>μ<sub>s</sub> = μ<sub>s</sub>′ / (1 − g)</code></div>
+        </div>
+        <p id="mu-s-used" class="conversion-note"></p>
+      </section>
+
+      <details class="panel limitations">
+        <summary>Asumsi dan batas model</summary>
+        <ul>
+          <li>Satu lapisan kulit homogen, bidang dianggap tidak berhingga.</li>
+          <li>Sumber berupa berkas sejajar yang datang tegak lurus.</li>
+          <li>Paket foton memiliki bobot sama; pada tumbukan, paket diserap atau dihamburkan.</li>
+          <li>Pantulan Fresnel, pembiasan, beberapa lapisan kulit, dan sudut pancaran LED belum dimodelkan.</li>
+          <li>R menghitung foton yang kembali melalui permukaan atas setelah hamburan, bukan pantulan Fresnel.</li>
+          <li>Grafik kedalaman menunjukkan jumlah paket terserap per interval, bukan fluens.</li>
+          <li>Simulasi menjelaskan transport cahaya pada model, bukan SPF, keamanan, atau manfaat klinis masker.</li>
+        </ul>
+      </details>
+    </main>
+
+    <footer>
+      <p>
+        Nilai awal optik kulit pada 660 nm diambil dari Girasol dkk. (2026),
+        <em>Lasers in Medical Science</em> 41, 109.
+        <a href="https://doi.org/10.1007/s10103-026-04911-7" target="_blank" rel="noreferrer">DOI: 10.1007/s10103-026-04911-7</a>.
+      </p>
+      <p class="footer-note">Semua perhitungan berjalan di peramban. Tidak ada data yang dikirim ke server.</p>
+    </footer>
+  </body>
+</html>
